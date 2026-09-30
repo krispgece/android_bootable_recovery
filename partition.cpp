@@ -173,6 +173,7 @@ enum TW_FSTAB_FLAGS {
 	TWFLAG_DM_USE_ORIGINAL_PATH,
 	TWFLAG_LOGICAL,
 	TWFLAG_METADATA_CSUM,
+	TWFLAG_PERDEVICE,
 };
 
 /* Flags without a trailing '=' are considered dual format flags and can be
@@ -224,6 +225,7 @@ const struct flag_list tw_flags[] = {
 	{ "dm_use_original_path",   TWFLAG_DM_USE_ORIGINAL_PATH },
 	{ "logical",                TWFLAG_LOGICAL },
 	{ "metadata_csum",          TWFLAG_METADATA_CSUM },
+	{ "perdevice",              TWFLAG_PERDEVICE },
 	{ 0,                        0 },
 };
 
@@ -293,6 +295,7 @@ TWPartition::TWPartition() {
 	Original_Path = "";
 	Use_Original_Path = false;
 	Needs_Metadata_Csum = false;
+	Per_Device_Backup = false;
 }
 
 TWPartition::~TWPartition(void) {
@@ -1085,6 +1088,9 @@ void TWPartition::Apply_TW_Flag(const unsigned flag, const char* str, const bool
 			break;
 		case TWFLAG_METADATA_CSUM:
 			Needs_Metadata_Csum = true;
+			break;
+		case TWFLAG_PERDEVICE:
+			Per_Device_Backup = true;
 			break;
 		default:
 			// Should not get here

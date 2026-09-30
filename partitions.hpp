@@ -291,6 +291,7 @@ private:
 	string Original_Path;
 	bool Use_Original_Path;
 	bool Needs_Metadata_Csum;
+	bool Per_Device_Backup;                                                   // A backup belongs to the phone it was made on (e.g. NVRAM: IMEI, calibration); twrp.flags "perdevice"
 
 	struct partition_fs_flags_struct {                                        // This struct is used to store mount flags and options for different file systems for the same partition
 		string File_System;

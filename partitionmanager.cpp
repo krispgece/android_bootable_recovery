@@ -1298,6 +1298,9 @@ int TWPartitionManager::Run_Backup(bool adbbackup) {
 bool TWPartitionManager::Restore_Partition(PartitionSettings* part_settings) {
 	time_t Start, Stop;
 
+	if (part_settings->Part->Per_Device_Backup)
+		gui_msg(Msg(msg::kWarning, "restore_per_device_part=Restoring {1}: a backup of another phone breaks this one (IMEI, calibration).")(
+				part_settings->Part->Backup_Display_Name));
 	if (part_settings->adbbackup) {
 		std::string partName =
 				part_settings->Part->Backup_Name + "." + part_settings->Part->Current_File_System + ".win";
@@ -1469,6 +1472,7 @@ int TWPartitionManager::Run_Restore(const string& Restore_Name) {
 void TWPartitionManager::Set_Restore_Files(string Restore_Name) {
 	// Start with the default values
 	string Restore_List;
+	string Restore_Selected, Per_Device_Names;
 	bool get_date = true, check_encryption = true;
 	bool adbbackup = false;
 
@@ -1566,10 +1570,18 @@ void TWPartitionManager::Set_Restore_Files(string Restore_Name) {
 			}
 
 			if (!Part->Is_SubPartition) {
+				string entry;
 				if (Part->Backup_Path == Get_Android_Root_Path())
-					Restore_List += "/system;";
+					entry = "/system;";
 				else
-					Restore_List += Part->Backup_Path + ";";
+					entry = Part->Backup_Path + ";";
+				Restore_List += entry;
+				// Listed, but not selected by default: restoring another phone's backup of
+				// such a partition breaks this phone
+				if (Part->Per_Device_Backup)
+					Per_Device_Names += (Per_Device_Names.empty() ? "" : ", ") + Part->Backup_Display_Name;
+				else
+					Restore_Selected += entry;
 			}
 		}
 		closedir(d);
@@ -1577,12 +1589,18 @@ void TWPartitionManager::Set_Restore_Files(string Restore_Name) {
 
 	if (adbbackup) {
 		Restore_List = "ADB_Backup;";
+		Restore_Selected = Restore_List;
+		Per_Device_Names.clear();
 		adbbackup = false;
 	}
 
+	if (!Per_Device_Names.empty())
+		gui_msg(Msg(msg::kWarning, "restore_per_device=Not selected: {1}. These backups belong to the phone they were made on; select them only to restore this phone's own backup.")(
+				Per_Device_Names));
+
 	// Set the final value
 	DataManager::SetValue("tw_restore_list", Restore_List);
-	DataManager::SetValue("tw_restore_selected", Restore_List);
+	DataManager::SetValue("tw_restore_selected", Restore_Selected);
 	return;
 }
 
@@ -2774,7 +2792,8 @@ void TWPartitionManager::Get_Partition_List(string ListType,
 					} else {
 						part.Display_Name = restore_part->Backup_Display_Name;
 						part.Mount_Point = restore_part->Backup_Path;
-						part.selected = 1;
+						// matches the default selection of Set_Restore_Files()
+						part.selected = restore_part->Per_Device_Backup ? 0 : 1;
 						Partition_List->push_back(part);
 					}
 				} else {
