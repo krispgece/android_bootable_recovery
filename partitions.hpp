@@ -425,6 +425,7 @@ public:
 	std::string Get_Super_Layout();                                           // Layout recovery started with (TW_SUPER_LAYOUT_PROP), empty if the device does not report one
 	bool Is_Super_Layout_Stale();                                             // True once the layout changed, or super was unmapped for a zip, since recovery started
 	void Check_Super_Layout_After_Zip(bool Unmapped);                         // Re-checks the layout after a zip and refreshes or drops the affected entries
+	void UnMount_Super_Partitions();                                          // Unmounts every logical partition, e.g. before an updater remaps them
 
 private:
 	void Setup_Settings_Storage_Partition(TWPartition* Part);                 // Sets up settings storage

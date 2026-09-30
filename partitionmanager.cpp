@@ -4600,6 +4600,15 @@ void TWPartitionManager::Refresh_Super_Volumes() {
 	Prepare_All_Super_Volumes();
 }
 
+void TWPartitionManager::UnMount_Super_Partitions() {
+	for (TWPartition* part : Partitions) {
+		if (part->Is_Super && part->Is_Mounted()) {
+			LOGINFO("Unmounting %s before the zip remaps it\n", part->Mount_Point.c_str());
+			part->UnMount(false);
+		}
+	}
+}
+
 void TWPartitionManager::Check_Super_Layout_After_Zip(bool Unmapped) {
 	std::string boot_layout = Get_Super_Layout();
 	if (boot_layout.empty())

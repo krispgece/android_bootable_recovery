@@ -595,12 +595,27 @@ int TWinstall_zip(const char* path, int* wipe_cache, bool check_for_digest) {
 		return INSTALL_CORRUPT;
 	}
 
+	// A ROM zip rewrites partitions recovery may have mounted. Unlike TWRP, PBRP has no general
+	// "Unmounting System" step at this point (the GUI flash action unmounts the main partitions
+	// on devices with a super device, sideload and OpenRecoveryScript do not).
+	rom_zip_type rom_type = Get_Rom_Zip_Type(Zip);
+	if (rom_type != NOT_A_ROM_ZIP && android::base::GetBoolProperty("twrp.apex.flattened", false))
+		umount("/apex"); // a bind mount from system, as in GUIAction::flash_zip()
+	if (rom_type == DYNAMIC_ROM_ZIP) {
+		// update_dynamic_partitions unmaps the logical partitions before it rewrites the LP
+		// metadata, and fails while recovery has one of them mounted
+		PartitionManager.UnMount_Super_Partitions();
+	} else if (rom_type == STATIC_ROM_ZIP) {
+		PartitionManager.UnMount_By_Path(PartitionManager.Get_Android_Root_Path(), false);
+		PartitionManager.UnMount_By_Path("/vendor", false);
+	}
+
 	// Recovery maps the dynamic partitions from super at startup. A ROM zip that writes system and
 	// vendor as raw partitions must not write under those mappings, so unmap them first. Any
 	// other zip keeps them: kernel, root and add-on zips mount the logical partitions.
 	bool unmapped_super = false;
 	if (PartitionManager.Get_Super_Layout() == "dynamic" && !PartitionManager.Is_Super_Layout_Stale() &&
-			Get_Rom_Zip_Type(Zip) == STATIC_ROM_ZIP) {
+			rom_type == STATIC_ROM_ZIP) {
 		gui_warn("static_rom_unmap=This zip writes system/vendor as raw partitions (non-dynamic ROM). Unmapping the dynamic partitions first.");
 		if (!PartitionManager.Unmap_Super_Devices()) {
 			gui_err("static_rom_unmap_err=Unable to unmap the dynamic partitions. Use Reboot > Recovery and try again.");
