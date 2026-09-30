@@ -599,15 +599,20 @@ int TWinstall_zip(const char* path, int* wipe_cache, bool check_for_digest) {
 	// "Unmounting System" step at this point (the GUI flash action unmounts the main partitions
 	// on devices with a super device, sideload and OpenRecoveryScript do not).
 	rom_zip_type rom_type = Get_Rom_Zip_Type(Zip);
-	if (rom_type != NOT_A_ROM_ZIP && android::base::GetBoolProperty("twrp.apex.flattened", false))
-		umount("/apex"); // a bind mount from system, as in GUIAction::flash_zip()
+	if (rom_type != NOT_A_ROM_ZIP) {
+		if (android::base::GetBoolProperty("twrp.apex.flattened", false))
+			umount("/apex"); // a bind mount from system, as in GUIAction::flash_zip()
+		// System and vendor, raw or logical. A static ROM zip rewrites them as raw partitions. A
+		// dynamic ROM zip installed over a non-dynamic ROM writes the LP metadata to the raw system
+		// partition and then maps the logical partitions from it, which device-mapper refuses
+		// (EBUSY) while a filesystem on the raw partition is still mounted.
+		PartitionManager.UnMount_By_Path(PartitionManager.Get_Android_Root_Path(), false);
+		PartitionManager.UnMount_By_Path("/vendor", false);
+	}
 	if (rom_type == DYNAMIC_ROM_ZIP) {
 		// update_dynamic_partitions unmaps the logical partitions before it rewrites the LP
 		// metadata, and fails while recovery has one of them mounted
 		PartitionManager.UnMount_Super_Partitions();
-	} else if (rom_type == STATIC_ROM_ZIP) {
-		PartitionManager.UnMount_By_Path(PartitionManager.Get_Android_Root_Path(), false);
-		PartitionManager.UnMount_By_Path("/vendor", false);
 	}
 
 	// Recovery maps the dynamic partitions from super at startup. A ROM zip that writes system and
