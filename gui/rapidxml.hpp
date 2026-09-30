@@ -1415,7 +1415,12 @@ namespace rapidxml
                         this->append_node(node);
                 }
                 else
+                {
                     RAPIDXML_PARSE_ERROR("expected <", text);
+                    // The error handler returns (no exceptions, no abort) and text
+                    // did not move, so without this the loop never ends
+                    break;
+                }
             }
 
         }
