@@ -18,6 +18,7 @@
 
 #include <errno.h>
 #include <fcntl.h>
+#include <poll.h>
 #include <signal.h>
 #include <stdlib.h>
 #include <string.h>
@@ -29,6 +30,7 @@
 #include <unistd.h>
 
 #include <atomic>
+#include <chrono>
 #include <functional>
 #include <map>
 #include <utility>
@@ -57,13 +59,22 @@ using CommandFunction = std::function<std::pair<bool, bool>()>;
 
 pid_t child;
 
+// How long minadbd may take, after the install, to hand the final status ("DONEDONE") to the host
+// and exit by itself (SideloadHostService() in minadbd/minadbd_services.cpp exits right after
+// writing it).
+static constexpr int kMinadbdExitGraceMillis = 5 * 1000;
+
+// Upper bound for putting the USB configuration back after a sideload.
+static constexpr std::chrono::milliseconds kUsbRestoreTimeout(10 * 1000);
+
 pid_t GetMiniAdbdPid() {
   return child;
 }
 
-static bool SetUsbConfig(const std::string& state) {
+static bool SetUsbConfig(const std::string& state,
+                         std::chrono::milliseconds timeout = std::chrono::milliseconds::max()) {
   android::base::SetProperty("sys.usb.config", state);
-  return android::base::WaitForProperty("sys.usb.state", state);
+  return android::base::WaitForProperty("sys.usb.state", state, timeout);
 }
 
 // Parses the minadbd command in |message|; returns MinadbdCommand::kError upon errors.
@@ -119,6 +130,9 @@ static auto AdbInstallPackageHandler(int* result) {
     }
     int dummy;
     *result = TWinstall_zip(FUSE_SIDELOAD_HOST_PATHNAME, &dummy);
+    // One package per session: minadbd exits after serving it, so there is nothing left to wait
+    // for (see ListenAndExecuteMinadbdCommands()).
+    should_continue = false;
     break;
   }
 
@@ -156,9 +170,10 @@ static auto AdbRebootHandler(MinadbdCommand command, int* result,
 }
 
 // Parses and executes the command from minadbd. Returns whether the caller should keep waiting for
-// next command.
+// next command. |handled_command| is set once a command has run and its status was sent back.
 static bool HandleMessageFromMinadbd(int socket_fd,
-                                     const std::map<MinadbdCommand, CommandFunction>& command_map) {
+                                     const std::map<MinadbdCommand, CommandFunction>& command_map,
+                                     MinadbdCommand* handled_command) {
   char buffer[kMinadbdMessageSize];
   if (!android::base::ReadFully(socket_fd, buffer, kMinadbdMessageSize)) {
     PLOG(ERROR) << "Failed to read message from minadbd";
@@ -185,7 +200,42 @@ static bool HandleMessageFromMinadbd(int socket_fd,
                        socket_fd)) {
     return false;
   }
+  *handled_command = command_type;
   return should_continue;
+}
+
+// Waits until minadbd hangs up its end of |socket_fd| (it exits after serving a sideload), or until
+// |timeout_ms| has passed.
+static void WaitForMinadbdExit(int socket_fd, int timeout_ms) {
+  const auto end = std::chrono::steady_clock::now() + std::chrono::milliseconds(timeout_ms);
+  while (true) {
+    auto left = std::chrono::duration_cast<std::chrono::milliseconds>(
+                    end - std::chrono::steady_clock::now())
+                    .count();
+    if (left <= 0) {
+      LOG(WARNING) << "minadbd did not exit within " << timeout_ms << " ms";
+      return;
+    }
+    struct pollfd pfd = {};
+    pfd.fd = socket_fd;
+    pfd.events = POLLIN;
+    int rc = TEMP_FAILURE_RETRY(poll(&pfd, 1, static_cast<int>(left)));
+    if (rc == -1) {
+      PLOG(ERROR) << "Failed to poll the minadbd socket";
+      return;
+    }
+    if (rc == 0) {
+      continue;  // timed out, handled at the top of the loop
+    }
+    if (pfd.revents & (POLLHUP | POLLERR | POLLNVAL)) {
+      return;
+    }
+    // Nothing is expected from minadbd any more; drop it and keep waiting for the hang-up.
+    char buffer[kMinadbdMessageSize];
+    if (TEMP_FAILURE_RETRY(read(socket_fd, buffer, sizeof(buffer))) <= 0) {
+      return;
+    }
+  }
 }
 
 // TODO(xunchang) add a wrapper function and kill the minadbd service there.
@@ -234,7 +284,13 @@ static void ListenAndExecuteMinadbdCommands(
         kill(minadbd_pid, SIGKILL);
         return;
       }
-      if (!HandleMessageFromMinadbd(socket_fd.get(), command_map)) {
+      MinadbdCommand handled_command = MinadbdCommand::kError;
+      if (!HandleMessageFromMinadbd(socket_fd.get(), command_map, &handled_command)) {
+        if (handled_command == MinadbdCommand::kInstall) {
+          // The sideload is over. minadbd still passes the result on to the host and then exits;
+          // give it a moment so the host sees a clean end, but don't wait the full 300 s above.
+          WaitForMinadbdExit(socket_fd.get(), kMinadbdExitGraceMillis);
+        }
         kill(minadbd_pid, SIGKILL);
         return;
       }
@@ -365,12 +421,14 @@ static void CreateMinadbdServiceAndExecuteCommands(
 
   // Clean up before switching to the older state, for example setting the state
   // to none sets sys/class/android_usb/android0/enable to 0.
-  if (!SetUsbConfig("none")) {
+  // Both waits are bounded: if the gadget never reports the state, an unbounded wait would keep
+  // the GUI on the sideload page for good.
+  if (!SetUsbConfig("none", kUsbRestoreTimeout)) {
     LOG(ERROR) << "Failed to clear USB config";
   }
 
   if (usb_state != "none") {
-    if (!SetUsbConfig(usb_state)) {
+    if (!SetUsbConfig(usb_state, kUsbRestoreTimeout)) {
       LOG(ERROR) << "Failed to set USB config to " << usb_state;
     }
   }

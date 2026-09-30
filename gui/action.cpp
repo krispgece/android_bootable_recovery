@@ -1778,6 +1778,22 @@ int GUIAction::decrypt(std::string arg __unused)
 	return 0;
 }
 
+// Maps the target of an "adb reboot" received in sideload mode to a tw_reboot_arg value
+static string sideload_reboot_arg(Device::BuiltinAction reboot_action)
+{
+	switch (reboot_action) {
+		case Device::REBOOT_BOOTLOADER:
+			return "bootloader";
+		case Device::REBOOT_FASTBOOT:
+			return "fastboot";
+		case Device::REBOOT_RECOVERY:
+		case Device::REBOOT_RESCUE: // no rescue mode in PBRP
+			return "recovery";
+		default:
+			return "system";
+	}
+}
+
 int GUIAction::adbsideload(std::string arg __unused)
 {
 	operation_start("Sideload");
@@ -1789,10 +1805,19 @@ int GUIAction::adbsideload(std::string arg __unused)
 		bool mtp_was_enabled = TWFunc::Toggle_MTP(false);
 
 		// wait for the adb connection
-		Device::BuiltinAction reboot_action = Device::REBOOT_BOOTLOADER;
+		Device::BuiltinAction reboot_action = Device::NO_ACTION;
 		int ret = twrp_sideload("/", &reboot_action);
 		sideload_child_pid = GetMiniAdbdPid();
 		DataManager::SetValue("tw_has_cancel", 0); // Remove cancel button from gui now that the zip install is going to start
+
+		if (reboot_action != Device::NO_ACTION) {
+			// "adb reboot [target]" arrived instead of a package: reboot as asked
+			// instead of reporting a failed sideload
+			LOGINFO("Reboot requested over adb while in sideload mode\n");
+			TWFunc::Toggle_MTP(mtp_was_enabled);
+			operation_end(0);
+			return reboot(sideload_reboot_arg(reboot_action));
+		}
 
 		if (ret != 0) {
 			if (ret == -2)
