@@ -158,6 +158,7 @@
 #define TW_MODULES_MOUNTED_PROP     "twrp.modules.loaded"     // property for successfully mounted modules
 #define TW_KEYMASTER_VERSION_PROP   "keymaster_ver"
 #define TW_SUPER_LAYOUT_PROP        "twrp.begonia.layout"     // set at boot by the device's layout script: dynamic, legacy or unknown
+#define TW_SUPER_LAYOUT_SCRIPT      "/system/bin/begonia-layout.sh" // the layout script; with --check it only prints the current layout
 
 // Theme versioning
 // version 2 requires theme to handle power button as action togglebacklight

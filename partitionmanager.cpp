@@ -28,6 +28,7 @@
 #include <sys/stat.h>
 #include <sys/vfs.h>
 #include <unistd.h>
+#include <algorithm>
 #include <map>
 #include <vector>
 #include <dirent.h>
@@ -551,8 +552,16 @@ void TWPartitionManager::Setup_Fstab_Partitions(bool Display_Error) {
 		Setup_Super_Partition();
 	else if (TWFunc::Path_Exists(Get_Super_Partition()))
 		LOGINFO("%s has no LP metadata, not treating it as super\n", Get_Super_Partition().c_str());
-	if (android::base::GetProperty(TW_SUPER_LAYOUT_PROP, "") == "unknown")
+	std::string boot_layout = Get_Super_Layout();
+	if (boot_layout == "unknown")
 		gui_warn("super_layout_unknown=Could not detect the system/vendor partition layout. System, Vendor and Super actions are not available.");
+	if (!boot_layout.empty()) {
+		// TWRP may have restarted after a zip changed the layout; the fstab still
+		// describes the layout found at boot
+		std::string layout = Detect_Super_Layout();
+		if (layout != boot_layout)
+			Mark_Super_Layout_Stale(boot_layout, layout);
+	}
 	UnMount_Main_Partitions();
 #ifdef AB_OTA_UPDATER
 	DataManager::SetValue("tw_active_slot", Get_Active_Slot_Display());
@@ -2506,7 +2515,9 @@ void TWPartitionManager::UnMount_Main_Partitions(void) {
 	TWPartition* Partition = Find_Partition_By_Path("/vendor");
 
 	if (Partition != NULL) UnMount_By_Path("/vendor", false);
-	UnMount_By_Path(Get_Android_Root_Path(), true);
+	// The system entry is gone once a zip changed the partition layout (Is_Super_Layout_Stale())
+	if (!Is_Super_Layout_Stale() || Find_Partition_By_Path(Get_Android_Root_Path()) != NULL)
+		UnMount_By_Path(Get_Android_Root_Path(), true);
 	Partition = Find_Partition_By_Path("/product");
 	if (Partition != NULL) UnMount_By_Path("/product", false);
 	if (!datamedia) UnMount_By_Path("/data", true);
@@ -4448,6 +4459,144 @@ bool TWPartitionManager::Unmap_Super_Devices() {
 		}
 	}
 	return true;
+}
+
+// The partitions that make up super on the retrofit layout that TW_SUPER_LAYOUT_PROP describes
+// (BOARD_SUPER_PARTITION_BLOCK_DEVICES). What they hold changes with the installed ROM.
+static const char* const Super_Layout_Block_Devices[] = {
+	"/dev/block/by-name/system",
+	"/dev/block/by-name/vendor",
+};
+
+// Set once the partition entries no longer match the layout on disk; cleared only by restarting
+// recovery
+static bool super_layout_stale = false;
+
+std::string TWPartitionManager::Get_Super_Layout() {
+	return android::base::GetProperty(TW_SUPER_LAYOUT_PROP, "");
+}
+
+bool TWPartitionManager::Is_Super_Layout_Stale() {
+	return super_layout_stale;
+}
+
+std::string TWPartitionManager::Detect_Super_Layout() {
+	std::string result;
+
+	if (!TWFunc::Path_Exists(TW_SUPER_LAYOUT_SCRIPT)) {
+		LOGINFO("%s not found, partition layout unknown\n", TW_SUPER_LAYOUT_SCRIPT);
+		return "unknown";
+	}
+	int ret = TWFunc::Exec_Cmd(std::string(TW_SUPER_LAYOUT_SCRIPT) + " --check", result, false);
+	result = android::base::Trim(result);
+	if (ret != 0 || (result != "dynamic" && result != "legacy")) {
+		LOGINFO("%s --check returned %d, '%s': partition layout unknown\n", TW_SUPER_LAYOUT_SCRIPT, ret, result.c_str());
+		return "unknown";
+	}
+	return result;
+}
+
+void TWPartitionManager::Remove_Super_Block_Device_Partitions() {
+	std::vector<std::string> super_devices;
+	for (const char* device : Super_Layout_Block_Devices) {
+		std::string real_path;
+		if (android::base::Realpath(device, &real_path))
+			super_devices.push_back(real_path);
+	}
+	if (super_devices.empty())
+		return;
+
+	for (auto iter = Partitions.begin(); iter != Partitions.end();) {
+		TWPartition* part = *iter;
+		bool on_super_device = false;
+		for (const std::string& device : {part->Primary_Block_Device, part->Alternate_Block_Device, part->Actual_Block_Device}) {
+			std::string real_path;
+			if (!device.empty() && android::base::Realpath(device, &real_path) &&
+					std::find(super_devices.begin(), super_devices.end(), real_path) != super_devices.end()) {
+				on_super_device = true;
+				break;
+			}
+		}
+		if (!on_super_device) {
+			++iter;
+			continue;
+		}
+		LOGINFO("Removing %s (%s) until recovery restarts\n", part->Mount_Point.c_str(), part->Actual_Block_Device.c_str());
+		part->UnMount(false);
+		iter = Partitions.erase(iter);
+		delete part;
+	}
+	Write_Fstab();
+}
+
+void TWPartitionManager::Mark_Super_Layout_Stale(const std::string& Boot_Layout, const std::string& Layout) {
+	super_layout_stale = true;
+	// Raw entries on these devices now point at something else (e.g. a raw system image on what
+	// is now LP metadata): wiping, restoring or flashing them would destroy the new ROM
+	Remove_Super_Block_Device_Partitions();
+	if (Layout != Boot_Layout)
+		gui_msg(Msg(msg::kWarning, "super_layout_changed=Partition layout changed from {1} to {2}. System and Vendor are hidden until you use Reboot > Recovery.")(Boot_Layout)(Layout));
+	else
+		gui_msg(Msg(msg::kWarning, "super_unmapped=The dynamic partitions were unmapped for a zip. System and Vendor are hidden until you use Reboot > Recovery."));
+}
+
+void TWPartitionManager::Refresh_Super_Volumes() {
+	std::string super_device = Get_Super_Partition();
+#ifdef AB_OTA_UPDATER
+	uint32_t slot = Get_Active_Slot_Display() == "A" ? 0 : 1;
+#else
+	uint32_t slot = 0;
+#endif
+
+	for (TWPartition* part : Partitions) {
+		if (!part->Is_Super)
+			continue;
+		std::string bare_partition_name = Get_Bare_Partition_Name(part->Get_Mount_Point());
+		std::string dm_name = bare_partition_name;
+#ifdef AB_OTA_UPDATER
+		dm_name += Get_Active_Slot_Suffix();
+#endif
+		// Prepare_Super_Volume() only creates this link when it is missing, so drop one that
+		// points at a dm device: it may be the old mapping
+		std::string link = "/dev/block/bootdevice/by-name/" + bare_partition_name;
+		std::string target;
+		if (android::base::Readlink(link, &target) && android::base::StartsWith(target, "/dev/block/dm-"))
+			unlink(link.c_str());
+		if (android::dm::DeviceMapper::Instance().GetState(dm_name) != android::dm::DmDeviceState::INVALID)
+			continue;
+		android::fs_mgr::CreateLogicalPartitionParams params = {
+			.block_device = super_device,
+			.metadata_slot = slot,
+			.partition_name = dm_name,
+			.timeout_ms = std::chrono::milliseconds(5000),
+		};
+		std::string path;
+		if (android::fs_mgr::CreateLogicalPartition(params, &path))
+			LOGINFO("Mapped %s on %s\n", dm_name.c_str(), path.c_str());
+		else
+			LOGINFO("Unable to map %s from %s\n", dm_name.c_str(), super_device.c_str());
+	}
+	// Points each entry at the dm device that now carries its name; entries that cannot be
+	// prepared are dropped
+	Prepare_All_Super_Volumes();
+}
+
+void TWPartitionManager::Check_Super_Layout_After_Zip(bool Unmapped) {
+	std::string boot_layout = Get_Super_Layout();
+	if (boot_layout.empty())
+		return;
+
+	std::string layout = Detect_Super_Layout();
+	LOGINFO("Partition layout after the zip: %s (recovery started with %s)\n", layout.c_str(), boot_layout.c_str());
+	if (!Unmapped && !super_layout_stale && layout == boot_layout) {
+		// Still the layout the entries were made for. The updater of a dynamic ROM zip unmaps and
+		// remaps the logical partitions (update_dynamic_partitions, map_partition), so pick up
+		// their current devices.
+		if (layout == "dynamic")
+			Refresh_Super_Volumes();
+		return;
+	}
+	Mark_Super_Layout_Stale(boot_layout, layout);
 }
 
 bool TWPartitionManager::Check_Pending_Merges() {

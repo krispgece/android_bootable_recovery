@@ -421,6 +421,9 @@ public:
 	void Unlock_Block_Partitions();                                           // Unlock all block devices after update_engine runs
 	bool Unmap_Super_Devices();                                               // Unmap super devices in TWRP
 	bool Check_Pending_Merges();                                              // Check and run pending merges on data for VAB devices
+	std::string Get_Super_Layout();                                           // Layout recovery started with (TW_SUPER_LAYOUT_PROP), empty if the device does not report one
+	bool Is_Super_Layout_Stale();                                             // True once the layout changed, or super was unmapped for a zip, since recovery started
+	void Check_Super_Layout_After_Zip(bool Unmapped);                         // Re-checks the layout after a zip and refreshes or drops the affected entries
 
 private:
 	void Setup_Settings_Storage_Partition(TWPartition* Part);                 // Sets up settings storage
@@ -443,6 +446,10 @@ private:
 	std::string repacked_ramdisk_format;                                      // Ramdisk format of boot image to repack from
 	void Mark_User_Decrypted(int userID);                                     // Marks given user ID in Users_List as decrypted
 	void Check_Users_Decryption_Status();                                     // Checks to see if all users are decrypted
+	std::string Detect_Super_Layout();                                        // Runs TW_SUPER_LAYOUT_SCRIPT --check: dynamic, legacy or unknown
+	void Mark_Super_Layout_Stale(const std::string& Boot_Layout, const std::string& Layout); // Drops the entries the layout change made wrong and tells the user
+	void Remove_Super_Block_Device_Partitions();                              // Removes entries that sit directly on the super block devices
+	void Refresh_Super_Volumes();                                             // Maps missing logical partitions and points the entries at their current dm devices
 
 
 private:

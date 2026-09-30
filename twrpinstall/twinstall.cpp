@@ -30,6 +30,7 @@
 #include <ctype.h>
 #include <errno.h>
 #include <fcntl.h>
+#include <inttypes.h>
 #include <limits.h>
 #include <sys/mman.h>
 #include <sys/stat.h>
@@ -42,6 +43,7 @@
 #include <stdio.h>
 #include <cutils/properties.h>
 
+#include <android-base/strings.h>
 #include <android-base/unique_fd.h>
 
 #include "twcommon.h"
@@ -445,6 +447,72 @@ static int Run_Update_Binary(const char *path, int* wipe_cache, zip_type ztype) 
 	return INSTALL_SUCCESS;
 }
 
+enum rom_zip_type {
+	NOT_A_ROM_ZIP = 0,
+	STATIC_ROM_ZIP,		// writes system and vendor as raw partitions
+	DYNAMIC_ROM_ZIP		// rewrites the dynamic partition metadata (update_dynamic_partitions)
+};
+
+// Classifies |script|, an updater-script. A dynamic ROM calls update_dynamic_partitions. A ROM
+// with plain (non-dynamic) system and vendor partitions never does, and one of its statements
+// writes by-name/system or by-name/vendor with block_image_update, package_extract_file,
+// write_raw_image or format.
+static rom_zip_type Get_Rom_Script_Type(const std::string& script) {
+	static const char* const raw_writers[] = {"block_image_update(", "package_extract_file(", "write_raw_image(", "format("};
+	static const char* const raw_targets[] = {"by-name/system\"", "by-name/vendor\""};
+
+	// Drop comment lines, then look at one statement at a time
+	std::string code;
+	for (const std::string& line : android::base::Split(script, "\n")) {
+		if (!android::base::StartsWith(android::base::Trim(line), "#"))
+			code += line + "\n";
+	}
+	if (code.find("update_dynamic_partitions") != std::string::npos)
+		return DYNAMIC_ROM_ZIP;
+	for (const std::string& statement : android::base::Split(code, ";")) {
+		bool writes = false;
+		for (const char* writer : raw_writers) {
+			if (statement.find(writer) != std::string::npos) {
+				writes = true;
+				break;
+			}
+		}
+		if (!writes)
+			continue;
+		for (const char* target : raw_targets) {
+			if (statement.find(target) != std::string::npos) {
+				LOGINFO("updater-script writes %.*s as a raw partition\n", (int) strlen(target) - 1, target);
+				return STATIC_ROM_ZIP;
+			}
+		}
+	}
+	return NOT_A_ROM_ZIP;
+}
+
+// Classifies a zip by its updater-script (see Get_Rom_Script_Type()). Zips without an
+// updater-script, or with only a placeholder one (shell update-binaries such as Magisk, KernelSU,
+// AnyKernel3 and most GApps and add-ons), are NOT_A_ROM_ZIP.
+static rom_zip_type Get_Rom_Zip_Type(ZipArchiveHandle Zip) {
+	static constexpr const char* UPDATER_SCRIPT_NAME = "META-INF/com/google/android/updater-script";
+	static constexpr uint64_t MAX_UPDATER_SCRIPT_SIZE = 1024 * 1024;
+
+	std::string script_name(UPDATER_SCRIPT_NAME);
+	ZipEntry64 script_entry;
+	if (FindEntry(Zip, script_name, &script_entry) != 0)
+		return NOT_A_ROM_ZIP;
+	if (script_entry.uncompressed_length == 0 || script_entry.uncompressed_length > MAX_UPDATER_SCRIPT_SIZE) {
+		LOGINFO("Not checking an updater-script of %" PRIu64 " bytes\n", script_entry.uncompressed_length);
+		return NOT_A_ROM_ZIP;
+	}
+	std::string script(script_entry.uncompressed_length, '\0');
+	int32_t ret = ExtractToMemory(Zip, &script_entry, reinterpret_cast<uint8_t*>(&script[0]), script_entry.uncompressed_length);
+	if (ret != 0) {
+		LOGINFO("Unable to read the updater-script: %s\n", ErrorCodeString(ret));
+		return NOT_A_ROM_ZIP;
+	}
+	return Get_Rom_Script_Type(script);
+}
+
 // Keeps the screen from timing out (and the lock screen from coming up) while a zip installs
 class BlankTimerPause {
 public:
@@ -527,6 +595,21 @@ int TWinstall_zip(const char* path, int* wipe_cache, bool check_for_digest) {
 		return INSTALL_CORRUPT;
 	}
 
+	// Recovery maps the dynamic partitions from super at startup. A ROM zip that writes system and
+	// vendor as raw partitions must not write under those mappings, so unmap them first. Any
+	// other zip keeps them: kernel, root and add-on zips mount the logical partitions.
+	bool unmapped_super = false;
+	if (PartitionManager.Get_Super_Layout() == "dynamic" && !PartitionManager.Is_Super_Layout_Stale() &&
+			Get_Rom_Zip_Type(Zip) == STATIC_ROM_ZIP) {
+		gui_warn("static_rom_unmap=This zip writes system/vendor as raw partitions (non-dynamic ROM). Unmapping the dynamic partitions first.");
+		if (!PartitionManager.Unmap_Super_Devices()) {
+			gui_err("static_rom_unmap_err=Unable to unmap the dynamic partitions. Use Reboot > Recovery and try again.");
+			PartitionManager.Check_Super_Layout_After_Zip(true);
+			return INSTALL_ERROR;
+		}
+		unmapped_super = true;
+	}
+
 	time_t start, stop;
 	time(&start);
 
@@ -589,6 +672,9 @@ int TWinstall_zip(const char* path, int* wipe_cache, bool check_for_digest) {
 			}
 		}
 	}
+	// Any zip may have switched the layout (static <-> dynamic ROM) or remapped the logical
+	// partitions
+	PartitionManager.Check_Super_Layout_After_Zip(unmapped_super);
 	time(&stop);
 	int total_time = (int) difftime(stop, start);
 	if (ret_val == INSTALL_CORRUPT) {
