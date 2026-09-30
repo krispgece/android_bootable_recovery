@@ -1841,6 +1841,12 @@ int GUIAction::adbsideload(std::string arg __unused)
 int GUIAction::adbsideloadcancel(std::string arg __unused)
 {
 	struct stat st;
+	if (DataManager::GetIntValue("tw_has_cancel") == 0) {
+		// The package transfer has already started: cancelling now would cut the
+		// updater off mid-install
+		LOGINFO("Sideload can no longer be cancelled, ignoring.\n");
+		return 0;
+	}
 	DataManager::SetValue("tw_has_cancel", 0); // Remove cancel button from gui
 	gui_msg("cancel_sideload=Cancelling ADB sideload...");
 	LOGINFO("Signaling child sideload process to exit.\n");

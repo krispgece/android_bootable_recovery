@@ -62,6 +62,7 @@
 #include "twrp-functions.hpp"
 #include "gui/gui.hpp"
 #include "gui/pages.hpp"
+#include "gui/blanktimer.hpp"
 #include "twinstall.h"
 #include "installcommand.h"
 #include "../twrpRepacker.hpp"
@@ -444,8 +445,16 @@ static int Run_Update_Binary(const char *path, int* wipe_cache, zip_type ztype) 
 	return INSTALL_SUCCESS;
 }
 
+// Keeps the screen from timing out (and the lock screen from coming up) while a zip installs
+class BlankTimerPause {
+public:
+	BlankTimerPause() { blankTimer.pauseTimeout(); }
+	~BlankTimerPause() { blankTimer.resumeTimeout(); }
+};
+
 int TWinstall_zip(const char* path, int* wipe_cache, bool check_for_digest) {
 	int ret_val, zip_verify = 1, reflashtwrp = 0;
+	BlankTimerPause blank_timer_pause;
 
 	if (strcmp(path, "error") == 0) {
 		LOGERR("Failed to get adb sideload file: '%s'\n", path);

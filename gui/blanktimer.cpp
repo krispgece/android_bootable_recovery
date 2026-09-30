@@ -34,6 +34,7 @@ extern "C" {
 blanktimer::blanktimer(void) {
 	pthread_mutex_init(&mutex, NULL);
 	setTime(0); // no timeout
+	pauseCount = 0;
 	state = kOn;
 	orig_brightness = getBrightness();
 }
@@ -55,6 +56,10 @@ void blanktimer::setTimer(void) {
 void blanktimer::checkForTimeout() {
 #ifndef TW_NO_SCREEN_TIMEOUT
 	pthread_mutex_lock(&mutex);
+	if (pauseCount > 0) {
+		pthread_mutex_unlock(&mutex);
+		return;
+	}
 	timespec curTime, diff;
 	clock_gettime(CLOCK_MONOTONIC, &curTime);
 	diff = TWFunc::timespec_diff(btimer, curTime);
@@ -139,6 +144,21 @@ void blanktimer::blank(void) {
 #endif
 	pthread_mutex_unlock(&mutex);
 #endif
+}
+
+void blanktimer::pauseTimeout(void) {
+	pthread_mutex_lock(&mutex);
+	pauseCount++;
+	pthread_mutex_unlock(&mutex);
+}
+
+void blanktimer::resumeTimeout(void) {
+	pthread_mutex_lock(&mutex);
+	if (pauseCount > 0)
+		pauseCount--;
+	if (pauseCount == 0)
+		setTimer();
+	pthread_mutex_unlock(&mutex);
 }
 
 void blanktimer::toggleBlank(void) {

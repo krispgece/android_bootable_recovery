@@ -19,7 +19,9 @@
 #ifndef __BLANKTIMER_HEADER_HPP
 #define __BLANKTIMER_HEADER_HPP
 
+#include <pthread.h>
 #include <sys/time.h>
+#include <string>
 
 using namespace std;
 
@@ -44,6 +46,11 @@ public:
 
 	void blank(void);
 
+	// call these around operations that must not time out the screen (e.g. zip installs);
+	// calls nest, the timeout restarts when the last one resumes
+	void pauseTimeout(void);
+	void resumeTimeout(void);
+
 private:
 	void setTimer(void);
 	string getBrightness(void);
@@ -53,6 +60,7 @@ private:
 	State state;
 	timespec btimer;
 	long sleepTimer;
+	int pauseCount;
 	string orig_brightness;
 };
 

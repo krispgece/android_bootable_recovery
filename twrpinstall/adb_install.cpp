@@ -43,6 +43,7 @@
 #include <android-base/strings.h>
 #include <android-base/unique_fd.h>
 
+#include "data.hpp"
 #include "fuse_sideload.h"
 #include "twinstall/install.h"
 #include "twinstall.h"
@@ -128,6 +129,9 @@ static auto AdbInstallPackageHandler(int* result) {
         break;
       }
     }
+    // The host is serving the package now: cancelling from here on would pull the package away
+    // from the updater mid-install, so take the Cancel button away before the install starts.
+    DataManager::SetValue("tw_has_cancel", 0);
     int dummy;
     *result = TWinstall_zip(FUSE_SIDELOAD_HOST_PATHNAME, &dummy);
     // One package per session: minadbd exits after serving it, so there is nothing left to wait
