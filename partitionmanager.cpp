@@ -2533,8 +2533,9 @@ void TWPartitionManager::UnMount_Main_Partitions(void) {
 	TWPartition* Partition = Find_Partition_By_Path("/vendor");
 
 	if (Partition != NULL) UnMount_By_Path("/vendor", false);
-	// The system entry is gone once a zip changed the partition layout (Is_Super_Layout_Stale())
-	if (!Is_Super_Layout_Stale() || Find_Partition_By_Path(Get_Android_Root_Path()) != NULL)
+	// With a layout script (TW_SUPER_LAYOUT_PROP) there is no system entry in "unknown" mode, nor
+	// once a zip changed the partition layout (Is_Super_Layout_Stale()): not an error there
+	if (Get_Super_Layout().empty() || Find_Partition_By_Path(Get_Android_Root_Path()) != NULL)
 		UnMount_By_Path(Get_Android_Root_Path(), true);
 	Partition = Find_Partition_By_Path("/product");
 	if (Partition != NULL) UnMount_By_Path("/product", false);
