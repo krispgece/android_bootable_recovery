@@ -474,6 +474,12 @@ endif
 ifeq ($(TW_SKIP_ADDITIONAL_FSTAB), true)
     LOCAL_CFLAGS += -DTW_SKIP_ADDITIONAL_FSTAB
 endif
+# Set when BOARD_SUPER_PARTITION_BLOCK_DEVICES lists more than one device (retrofit super spread
+# over several partitions): no raw Super backup/restore/flash entry is offered then, since that
+# entry would only cover the first block device.
+ifeq ($(TW_SUPER_MULTI_BLOCK_DEVICES), true)
+    LOCAL_CFLAGS += -DTW_SUPER_MULTI_BLOCK_DEVICES
+endif
 ifeq ($(TW_FORCE_KEYMASTER_VER), true)
     LOCAL_CFLAGS += -DTW_FORCE_KEYMASTER_VER
 endif

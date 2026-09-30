@@ -1302,7 +1302,9 @@ int GUIAction::flash(std::string arg)
 		DataManager::SetValue(TW_ZIP_INDEX, (i + 1));
 
 		TWFunc::SetPerformanceMode(true);
-		if (PartitionManager.Get_Super_Status())
+		// Checks the super device node, not Get_Super_Status(): on a retrofit layout the main
+		// partitions have to be unmounted before a zip whether or not a dynamic ROM is installed
+		if (TWFunc::Path_Exists(PartitionManager.Get_Super_Partition()))
 			PartitionManager.UnMount_Main_Partitions();
 		ret_val = flash_zip(zip_path, &wipe_cache);
 		TWFunc::SetPerformanceMode(false);

@@ -53,6 +53,7 @@
 #include <android-base/logging.h>
 #include <android-base/properties.h>
 #include <android-base/strings.h>
+#include <android-base/unique_fd.h>
 #include <fstab/fstab.h>
 #include <fs_avb/fs_avb.h>
 #include <fs_mgr.h>
@@ -546,7 +547,12 @@ void TWPartitionManager::Setup_Fstab_Partitions(bool Display_Error) {
 #endif
 
 	Update_System_Details();
-	if (Get_Super_Status()) Setup_Super_Partition();
+	if (Get_Super_Status())
+		Setup_Super_Partition();
+	else if (TWFunc::Path_Exists(Get_Super_Partition()))
+		LOGINFO("%s has no LP metadata, not treating it as super\n", Get_Super_Partition().c_str());
+	if (android::base::GetProperty(TW_SUPER_LAYOUT_PROP, "") == "unknown")
+		gui_warn("super_layout_unknown=Could not detect the system/vendor partition layout. System, Vendor and Super actions are not available.");
 	UnMount_Main_Partitions();
 #ifdef AB_OTA_UPDATER
 	DataManager::SetValue("tw_active_slot", Get_Active_Slot_Display());
@@ -4233,6 +4239,12 @@ void TWPartitionManager::Setup_Super_Devices() {
 }
 
 void TWPartitionManager::Setup_Super_Partition() {
+#ifdef TW_SUPER_MULTI_BLOCK_DEVICES
+	// Super spans more than one block device here and this entry would cover only the first:
+	// a backup of it is incomplete, and restoring or flashing it destroys the dynamic
+	// partitions. Don't offer it at all.
+	LOGINFO("Super spans several block devices, not adding a Super backup/flash entry\n");
+#else
 	TWPartition* superPartition = new TWPartition();
 	std::string superPart = Get_Super_Partition();
 
@@ -4265,10 +4277,48 @@ void TWPartitionManager::Setup_Super_Partition() {
 	superPartition->Setup_Image();
 	Add_Partition(superPartition);
 	PartitionManager.Output_Partition(superPartition);
+#endif
+}
+
+// Returns true if |device| carries LP (dynamic partition) metadata: the geometry magic follows
+// the reserved first LP_PARTITION_RESERVED_BYTES, and a backup copy follows the primary geometry.
+// liblp zeroes the reserved area, so a filesystem superblock in it (erofs at 1024, ext4 at 1080)
+// means a plain image was written over stale metadata.
+static bool Has_Lp_Geometry(const std::string& device) {
+	android::base::unique_fd fd(open(device.c_str(), O_RDONLY | O_CLOEXEC));
+	if (fd < 0)
+		return false;
+	uint32_t erofs_magic = 0;
+	uint16_t ext4_magic = 0;
+	if (TEMP_FAILURE_RETRY(pread64(fd.get(), &erofs_magic, sizeof(erofs_magic), 1024)) != static_cast<ssize_t>(sizeof(erofs_magic)) ||
+			TEMP_FAILURE_RETRY(pread64(fd.get(), &ext4_magic, sizeof(ext4_magic), 1080)) != static_cast<ssize_t>(sizeof(ext4_magic)))
+		return false;
+	if (erofs_magic == 0xE0F5E1E2 || ext4_magic == 0xEF53)
+		return false;
+	const off64_t offsets[] = {
+		LP_PARTITION_RESERVED_BYTES,
+		LP_PARTITION_RESERVED_BYTES + LP_METADATA_GEOMETRY_SIZE,
+	};
+	for (off64_t offset : offsets) {
+		uint32_t magic = 0;
+		if (TEMP_FAILURE_RETRY(pread64(fd.get(), &magic, sizeof(magic), offset)) == static_cast<ssize_t>(sizeof(magic)) &&
+				magic == LP_METADATA_GEOMETRY_MAGIC)
+			return true;
+	}
+	return false;
 }
 
 bool TWPartitionManager::Get_Super_Status() {
-	return access(Get_Super_Partition().c_str(), F_OK) == 0;
+	std::string super_device = Get_Super_Partition();
+	if (access(super_device.c_str(), F_OK) != 0)
+		return false;
+	// A dedicated super partition is super whatever it holds. On a retrofit layout
+	// (androidboot.super_partition=system, for example) the super device is an ordinary
+	// partition that holds LP metadata only while a dynamic ROM is installed: without the
+	// geometry magic it is not super.
+	if (android::base::Basename(super_device) == LP_METADATA_DEFAULT_PARTITION_NAME)
+		return true;
+	return Has_Lp_Geometry(super_device);
 }
 
 bool TWPartitionManager::Recreate_Logs_Dir() {
