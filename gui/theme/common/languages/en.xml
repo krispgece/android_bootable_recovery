@@ -981,5 +981,19 @@
 		<string name="restore_with_pattern2">Pattern should be disabled before restore</string>
 		<string name="reboot_after_restore">It is recommended to reboot Android once after first boot.</string>
 		<string name="install_took_seconds_msg">Install took {1} second(s).</string>
+
+		<!-- Static/dynamic partition layout on a retrofit super device -->
+		<string name="super_layout_unknown">Could not detect the system/vendor partition layout. System, Vendor and Super actions are not available.</string>
+		<!-- {1} is the layout recovery started with, {2} is the layout after the zip (dynamic, legacy or unknown) -->
+		<string name="super_layout_changed">Partition layout changed from {1} to {2}. System and Vendor are hidden until you use Reboot &gt; Recovery.</string>
+		<string name="super_unmapped">The dynamic partitions were unmapped for a zip. System and Vendor are hidden until you use Reboot &gt; Recovery.</string>
+		<string name="static_rom_unmap">This zip writes system/vendor as raw partitions (non-dynamic ROM). Unmapping the dynamic partitions first.</string>
+		<string name="static_rom_unmap_err">Unable to unmap the dynamic partitions. Use Reboot &gt; Recovery and try again.</string>
+
+		<!-- Backups of partitions flagged perdevice in twrp.flags -->
+		<!-- {1} is a comma separated list of partition display names -->
+		<string name="restore_per_device">Not selected: {1}. These backups belong to the phone they were made on; select them only to restore this phone's own backup.</string>
+		<!-- {1} is the partition display name -->
+		<string name="restore_per_device_part">Restoring {1}: a backup of another phone breaks this one (IMEI, calibration).</string>
 	</resources>
 </language>
