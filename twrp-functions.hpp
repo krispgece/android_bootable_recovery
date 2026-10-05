@@ -31,6 +31,8 @@
 #include "partitions.hpp"
 #endif
 
+struct bootloader_message;
+
 using namespace std;
 
 #define CACHE_LOGS_DIR "/cache/" // For devices with a dedicated cache partition
@@ -136,7 +138,7 @@ public:
 	static std::string getprop(std::string arg); //set the arg value to PB_PROP_VALUE
 	static int Delete_Property(string Prop_Name); // Delete properties (non-persistent properties only)
 	static void List_Mounts(); // List current mounts by the kernel
-	static void Clear_Bootloader_Message(); // Removes the bootloader message from misc for next boot
+	static void Clear_Bootloader_Message(const bootloader_message* startup = nullptr); // Removes the bootloader message from misc for next boot, unless it changed since startup
 	static string Check_For_TwrpFolder(); // Gets user defined path on storage where backups should be stored
 	static bool Find_Fstab(string &fstab);
 	static bool Get_Service_From_Manifest(std::string basepath, std::string service, std::string &ret);

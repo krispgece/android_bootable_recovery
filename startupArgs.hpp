@@ -47,10 +47,13 @@ public:
 	std::string Get_Intent();
 	bool Get_Fastboot_Mode();
 	bool processRecoveryArgs(std::vector<std::string> args, int index);
+	const bootloader_message* Get_Startup_Bcb();
 
 private:
 	bool SkipDecryption = false;
 	bool fastboot_mode = false;
 	std::string Send_Intent;
+	bootloader_message startup_bcb = {};
+	bool startup_bcb_valid = false;
 };
 #endif

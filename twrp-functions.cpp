@@ -627,8 +627,26 @@ void TWFunc::Update_Log_File(void) {
 	sync();
 }
 
-void TWFunc::Clear_Bootloader_Message() {
+void TWFunc::Clear_Bootloader_Message(const bootloader_message* startup) {
 	std::string err;
+	if (startup) {
+		// A reboot request that init wrote after the startup args were read
+		// (adb reboot fastboot while TWRP was starting) stays for the next boot,
+		// which consumes it. Re-read, compare and zero on one resolved device,
+		// so that a write can only slip in between within a few syscalls.
+		std::string misc = get_bootloader_message_blk_device(&err);
+		bootloader_message now;
+		if (misc.empty() || !read_bootloader_message_from(&now, misc, &err)) {
+			LOGINFO("Unable to re-read the BCB, clearing it: %s\n", err.c_str());
+		} else if (memcmp(&now, startup, sizeof(now)) != 0) {
+			std::string recovery(now.recovery, strnlen(now.recovery, sizeof(now.recovery)));
+			std::replace(recovery.begin(), recovery.end(), '\n', ' ');
+			LOGINFO("BCB changed during startup ('%.32s' '%s'), leaving it for the next boot\n", now.command, recovery.c_str());
+			return;
+		} else if (write_bootloader_message_to(bootloader_message{}, misc, &err)) {
+			return;
+		}
+	}
 	if (!clear_bootloader_message(&err)) {
 		LOGINFO("%s\n", err.c_str());
 	}

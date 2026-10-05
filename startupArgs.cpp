@@ -22,6 +22,16 @@ void startupArgs::parse(int *argc, char ***argv) {
 	std::vector<std::string> args = args::get_args(argc, argv);
 	int index;
 
+	// get_args() has just written the args back to the BCB. Keep a copy: adbd
+	// can be up before TWRP clears the BCB, and a reboot to fastbootd or
+	// sideload requested in between makes init write a different BCB, which
+	// has to survive. A repeat of the request this boot was started for writes
+	// the same bytes and is still cleared.
+	std::string err;
+	startup_bcb_valid = read_bootloader_message(&startup_bcb, &err);
+	if (!startup_bcb_valid)
+		LOGINFO("Unable to read the BCB after the startup args: %s\n", err.c_str());
+
 	LOGINFO("Startup Commands: ");
 	for (index = 1; index < args.size(); index++) {
 		if (!processRecoveryArgs(args, index))
@@ -94,4 +104,8 @@ std::string startupArgs::Get_Intent() {
 
 bool startupArgs::Get_Fastboot_Mode() {
 	return fastboot_mode;
+}
+
+const bootloader_message* startupArgs::Get_Startup_Bcb() {
+	return startup_bcb_valid ? &startup_bcb : nullptr;
 }

@@ -516,7 +516,7 @@ int main(int argc, char **argv) {
 		LOGERR("Failed To Copy prop.info\n");
 
 	twrpAdbBuFifo *adb_bu_fifo = new twrpAdbBuFifo();
-	TWFunc::Clear_Bootloader_Message();
+	TWFunc::Clear_Bootloader_Message(startup.Get_Startup_Bcb());
 
 	if (startup.Get_Fastboot_Mode()) {
 		process_fastbootd_mode();
