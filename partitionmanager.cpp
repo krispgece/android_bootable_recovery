@@ -2107,6 +2107,7 @@ void TWPartitionManager::Post_Decrypt(const string& Block_Device) {
 			startupArgs startup;
 			std::string content;
 			TWFunc::read_file(COMMAND_FILE, content);
+			LOGINFO("Commands from %s: '%s'\n", COMMAND_FILE, content.c_str());
 			std::vector<std::string> args = { content };
 			startup.processRecoveryArgs(args, 0);
 		}

@@ -32,12 +32,16 @@ void startupArgs::parse(int *argc, char ***argv) {
 	if (!startup_bcb_valid)
 		LOGINFO("Unable to read the BCB after the startup args: %s\n", err.c_str());
 
-	LOGINFO("Startup Commands: ");
+	// Log the whole list before handling any arg: handling an arg can log
+	// lines of its own (Inserting ...).
+	std::string list;
+	for (index = 1; index < args.size(); index++)
+		list += " '" + args[index] + "'";
+	LOGINFO("Startup Commands:%s\n", list.c_str());
 	for (index = 1; index < args.size(); index++) {
 		if (!processRecoveryArgs(args, index))
 			break;
 	}
-	printf("\n");
 }
 
 bool startupArgs::processRecoveryArgs(std::vector<std::string> args, int index) {
@@ -50,8 +54,7 @@ bool startupArgs::processRecoveryArgs(std::vector<std::string> args, int index) 
 		      gui_print(" \n");
 		      gui_msg(Msg(msg::kError, "rescue_party4=The reported problem is:"));
 		      gui_print_color("error", " '%s'\n\n", args[index+1].c_str());
-		} else
-		printf("'%s'", args[index].c_str());
+		}
 		if (args[index] == FASTBOOT) {
 			fastboot_mode = true;
 			android::base::SetProperty("sys.usb.config", "none");
