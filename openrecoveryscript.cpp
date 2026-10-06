@@ -380,21 +380,16 @@ int OpenRecoveryScript::run_script_file(void) {
 				DataManager::SetValue("tw_action_text2", gui_parse_text("{@sideload}"));
 				install_cmd = -1;
 
-				int wipe_cache = 0;
-				string result;
-
 				gui_msg("start_sideload=Starting ADB sideload feature...");
 
+				// twrp_sideload() installs the package itself while the host serves
+				// it, and /sideload is unmounted by the time it returns: use its
+				// result instead of installing /sideload/package.zip again.
 				Device::BuiltinAction reboot_action = Device::REBOOT_BOOTLOADER;
 				ret_val = twrp_sideload("/", &reboot_action);
 				if (ret_val != 0) {
 					if (ret_val == -2)
 						gui_err("need_new_adb=You need adb 1.0.32 or newer to sideload to this device.");
-					ret_val = 1; // failure
-				} else if (TWinstall_zip(FUSE_SIDELOAD_HOST_PATHNAME, &wipe_cache) == 0) {
-					if (wipe_cache)
-						PartitionManager.Wipe_By_Path("/cache");
-				} else {
 					ret_val = 1; // failure
 				}
 				PartitionManager.Unlock_Block_Partitions();
