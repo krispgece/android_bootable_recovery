@@ -338,7 +338,11 @@ static void ListenAndExecuteMinadbdCommands(
 static void CreateMinadbdServiceAndExecuteCommands(
     const std::map<MinadbdCommand, CommandFunction>& command_map,
     bool rescue_mode __unused, std::string install_file __unused) {
-  signal(SIGPIPE, SIG_IGN);
+  // Put back on the way out what was set before: TWRP ignores SIGPIPE for
+  // the whole process (twrp.cpp), and SIG_DFL here let a later write to a
+  // pipe without a reader (the ORS output FIFO once the twrp CLI has gone)
+  // kill the recovery after a sideload.
+  auto old_sigpipe = signal(SIGPIPE, SIG_IGN);
 
   android::base::unique_fd recovery_socket;
   android::base::unique_fd minadbd_socket;
@@ -392,7 +396,7 @@ static void CreateMinadbdServiceAndExecuteCommands(
     }
   }
 
-  signal(SIGPIPE, SIG_DFL);
+  signal(SIGPIPE, old_sigpipe);
 }
 
   int twrp_sideload(const char* install_file, Device::BuiltinAction* reboot_action) {
