@@ -1520,6 +1520,9 @@ void TWPartitionManager::Set_Restore_Files(string Restore_Name) {
 				strcat(file_path, str);
 				stat(file_path, &st);
 				string backup_date = ctime((const time_t*)(&st.st_mtime));
+				// ctime() ends the string with a newline, which the theme font draws as a box
+				if (!backup_date.empty() && backup_date.back() == '\n')
+					backup_date.pop_back();
 				DataManager::SetValue(TW_RESTORE_FILE_DATE, backup_date);
 				get_date = false;
 			}
