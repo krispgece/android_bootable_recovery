@@ -2854,10 +2854,8 @@
 				<text>{@restore_sel_store_hdr=Select Backup from %tw_storage_display_name% (%tw_storage_free_size% MB)}</text>
 			</text>
 
-			<template name="sort_options"/>
-
 			<fileselector>
-				<placement x="%indent%" y="%row3_y%" w="%content_width%" h="%fileselector_install_height%"/>
+				<placement x="%indent%" y="%row3_y%" w="%content_width%" h="1168"/>
 				<text>{@restore_sel_pack_fs=Select Package to Restore:}</text>
 				<filter folders="1" files="1" nav="0" extn=".ab"/>
 				<path name="tw_backups_folder"/>
