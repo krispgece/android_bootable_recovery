@@ -3068,17 +3068,17 @@
 			</text>
 
 			<text style="text_pb">
-				<placement x="%text_pb_x%" y="%row2_y%"/>
+				<placement x="%text_pb_x%" y="%row1a_y%"/>
 				<text>{@name=Name:}</text>
 			</text>
 
 			<text style="text_sub_header">
-				<placement x="%text_sub_header_x%" y="%row3_y%"/>
+				<placement x="%text_sub_header_x%" y="%row2a_y%"/>
 				<text>%tw_restore_name%</text>
 			</text>
 
 			<button>
-				<placement x="indent" y="%row3_y%" w="%content_width%" h="%navbar_height%"/>
+				<placement x="indent" y="%row2a_y%" w="%content_width%" h="64"/>
 				<fill color="%transparent%"/>
 				<actions>
 					<action function="set">tw_backup_rename=%tw_restore_name%</action>
@@ -3088,13 +3088,13 @@
 			</button>
 
 			<partitionlist>
-				<placement x="%partitionlist_x%" y="%row5_y%" w="%content_width%" h="%partitionlist_backup_height%"/>
+				<placement x="%partitionlist_x%" y="%row4_y%" w="%content_width%" h="%partitionlist_backup_height%"/>
 				<data name="tw_restore_list" selectedlist="tw_restore_selected"/>
 				<listtype name="restore"/>
 			</partitionlist>
 
 			<text style="text_pb">
-				<placement x="%text_pb_x%" y="%row4a_y%"/>
+				<placement x="%text_pb_x%" y="%row3a_y%"/>
 				<text>{@restore_sel_part=Select Partitions to Restore:}</text>
 			</text>
 
@@ -3294,18 +3294,18 @@
 			</text>
 
 			<partitionlist>
-				<placement x="%partitionlist_x%" y="%row3a_y%" w="%content_width%" h="%partitionlist_mount_height%"/>
+				<placement x="%partitionlist_x%" y="%row2a_y%" w="%content_width%" h="%partitionlist_mount_height%"/>
 				<listtype name="mount"/>
 			</partitionlist>
 
 			<text style="text_pb">
-				<placement x="%text_pb_x%" y="%row3_y%"/>
+				<placement x="%text_pb_x%" y="%row2_y%"/>
 				<text>{@mount_sel_part=Select Partitions to Mount:}</text>
 			</text>
 
 			<button style="checkbox">
 				<condition var1="tw_mount_system_ro" op="=" var2="0"/>
-				<placement x="%checkbox_x%" y="%row15a_y%" textplacement="6"/>
+				<placement x="%checkbox_x%" y="%row16_y%" textplacement="6"/>
 				<text>{@mount_sys_ro_chk=Mount system partition read-only}</text>
 				<image resource="checkbox_false"/>
 				<action function="mountsystemtoggle">1</action>
