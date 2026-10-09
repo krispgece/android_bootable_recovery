@@ -334,7 +334,7 @@
 
 		<style name="advanced_listbox">
 			<highlight color="%accent_color%"/>
-			<fastscroll linecolor="%background_color%" rectcolor="%accent_color%" w="%fastscroll_w%" linew="%fastscroll_linew%" rectw="%fastscroll_rectw%" recth="%fastscroll_recth%"/>
+			<fastscroll linecolor="%background_color%" rectcolor="%accent_color2%" w="%fastscroll_w%" linew="%fastscroll_linew%" rectw="%fastscroll_rectw%" recth="%fastscroll_recth%"/>
 			<dimensions lineh="%slidervalue_lineh%" linepadding="%slidervalue_padding%" sliderw="%slidervalue_sliderw%" sliderh="%slidervalue_sliderh%"/>
 			<background color="%background_color%"/>
 			<separator color="#8C8C8C" height="2"/>
@@ -1057,7 +1057,7 @@
 			</text>
 
 			<partitionlist>
-				<placement x="%text_header_x%" y="%row7a_y%" w="%content_width%" h="%partitionlist_flashimage_height%"/>
+				<placement x="%text_header_x%" y="%row7a_y%" w="%list_width%" h="%partitionlist_flashimage_height%"/>
 				<icon selected="checkbox_true" unselected="checkbox_false"/>
 				<data name="tw_flash_partition"/>
 				<listtype name="flashimg"/>
@@ -1629,7 +1629,7 @@
 			</image>
 
 			<partitionlist>
-				<placement x="%partitionlist_x%" y="%row5a_y%" w="%content_width%" h="%partitionlist_wipe_height%"/>
+				<placement x="%partitionlist_x%" y="%row5a_y%" w="%list_width%" h="%partitionlist_wipe_height%"/>
 				<data name="tw_wipe_list"/>
 				<listtype name="wipe"/>
 			</partitionlist>
@@ -2211,7 +2211,7 @@
 
 			<button>
 				<condition var1="tw_enable_adb_backup" op="!=" var2="1"/>
-				<placement x="indent" y="%row3_y%" w="%content_width%" h="%navbar_height%"/>
+				<placement x="%indent%" y="%row3_y%" w="%content_width%" h="%navbar_height%"/>
 				<fill color="%transparent%"/>
 				<actions>
 					<action function="set">tw_fileexists=0</action>
@@ -2220,7 +2220,7 @@
 			</button>
 
 			<partitionlist>
-				<placement x="%partitionlist_x%" y="%row5a_y%" w="%content_width%" h="708"/>
+				<placement x="%partitionlist_x%" y="%row5a_y%" w="%list_width%" h="708"/>
 				<data name="tw_backup_list"/>
 				<listtype name="backup"/>
 			</partitionlist>
@@ -3076,7 +3076,7 @@
 			</text>
 
 			<button>
-				<placement x="indent" y="%row2a_y%" w="%content_width%" h="64"/>
+				<placement x="%indent%" y="%row2a_y%" w="%content_width%" h="64"/>
 				<fill color="%transparent%"/>
 				<actions>
 					<action function="set">tw_backup_rename=%tw_restore_name%</action>
@@ -3086,7 +3086,7 @@
 			</button>
 
 			<partitionlist>
-				<placement x="%partitionlist_x%" y="%row4_y%" w="%content_width%" h="%partitionlist_backup_height%"/>
+				<placement x="%partitionlist_x%" y="%row4_y%" w="%list_width%" h="%partitionlist_backup_height%"/>
 				<data name="tw_restore_list" selectedlist="tw_restore_selected"/>
 				<listtype name="restore"/>
 			</partitionlist>
@@ -3292,7 +3292,7 @@
 			</text>
 
 			<partitionlist>
-				<placement x="%partitionlist_x%" y="%row2a_y%" w="%content_width%" h="%partitionlist_mount_height%"/>
+				<placement x="%partitionlist_x%" y="%row2a_y%" w="%list_width%" h="%partitionlist_mount_height%"/>
 				<listtype name="mount"/>
 			</partitionlist>
 
@@ -3322,7 +3322,7 @@
 
 			<button style="main_button_half_height_new">
 				<condition var1="tw_has_usb_storage" var2="1"/>
-				<placement x="%indent%" y="%row18_y%"/>
+				<placement x="%indent%" y="%row17a_y%"/>
 				<text>{@mount_usb_storage_btn=Mount USB Storage}</text>
 				<action function="page">usb_mount</action>
 			</button>
@@ -3332,7 +3332,7 @@
 					<condition var1="tw_is_encrypted" var2="1"/>
 					<condition var1="tw_is_decrypted" var2="0"/>
 				</conditions>
-				<placement x="%center_x%" y="%row18_y%"/>
+				<placement x="%center_x%" y="%row17a_y%"/>
 				<text>{@decrypt_data_btn=Decrypt Data}</text>
 				<action function="set">tw_crypto_user_id=0</action>
 				<action function="set">tw_crypto_password=</action>
@@ -4127,7 +4127,7 @@
 			</image>
 
 			<listbox style="scrolllist">
-				<placement x="%settings_scrolllist_x%" y="%row4a_y%" w="%content_width%" h="1140"/>
+				<placement x="%settings_scrolllist_x%" y="%row4a_y%" w="%list_width%" h="1024"/>
 				<icon selected="checkbox_true" unselected="checkbox_false"/>
 				<listitem name="{@zip_sig_chk=Zip signature verification}">
 					<data variable="tw_signed_zip_verify"/>
@@ -4228,7 +4228,7 @@
 			</image>
 
 			<listbox>
-				<placement x="%listbox_x%" y="%row4_y%" w="%content_width%" h="656"/>
+				<placement x="%listbox_x%" y="%row4_y%" w="%list_width%" h="656"/>
 				<data name="tw_time_zone_guisel"/>
 				<listitem name="{@utcm11=(UTC -11) Samoa, Midway Island}">BST11;BDT</listitem>
 				<listitem name="{@utcm10=(UTC -10) Hawaii}">HST10;HDT</listitem>
@@ -4425,7 +4425,7 @@
 
 			<text style="text_m">
 				<condition var1="tw_disable_haptics" var2="1"/>
-				<placement x="indent" y="%row4_y%" w="%content_width%"/>
+				<placement x="%indent%" y="%row4_y%" w="%content_width%"/>
 				<text>{@vibration_disabled=Vibration Disabled for Device}</text>
 			</text>
 
@@ -4487,7 +4487,7 @@
 			</text>
 
 			<listbox>
-				<placement x="%text_pb_x%" y="%row5_y%" w="%content_width%" h="1040"/>
+				<placement x="%text_pb_x%" y="%row5_y%" w="%list_width%" h="992"/>
 				<icon selected="radio_true" unselected="radio_false" />
 				<data name="tw_language" />
 			</listbox>
@@ -4593,7 +4593,7 @@
 			</button>
 
 			<listbox style="advanced_listbox">
-				<placement x="%listbox_x%" y="%row1a_y%" w="%screen_width%" h="%advanced_listbox_h%"/>
+				<placement x="%listbox_x%" y="%row1a_y%" w="%list_width%" h="%advanced_listbox_h%"/>
 				<listitem name="{@copy_log_btn=Copy Log}">
 					<text>{@copy_log_btn1=Generate logs to sdcard}</text>
 					<icon icon="main_button_log"/>
@@ -4760,7 +4760,7 @@
 			</text>
 
 			<partitionlist>
-				<placement x="%partitionlist_x%" y="%row3_y%" w="%content_width%" h="%partitionlist_storage_height%"/>
+				<placement x="%partitionlist_x%" y="%row3_y%" w="%list_width%" h="%partitionlist_storage_height%"/>
 				<data name="tw_storage_path"/>
 				<listtype name="storage"/>
 			</partitionlist>
@@ -5271,9 +5271,9 @@
 			</text>
 
 			<button style="main_button_half_height_full">
-				<contitions>
+				<conditions>
 					<condition var1="tw_fm_isfolder" var2="0"/>
-					<condition var1="pb_file_extn" var2="zip"/>
+					<condition var1="pb_file_extn" op="!=" var2="zip"/>
 				</conditions>
 				<placement x="%indent%" y="%row9_y%"/>
 				<text>{@fm_open_file_btn=Read File}</text>
@@ -6739,7 +6739,7 @@
 			</text>
 
 			<console>
-				<placement x="%indent%" y="80" w="%indent_right%" h="1550"/>
+				<placement x="%indent%" y="80" w="1035" h="1550"/>
 			</console>
 
 			<button>
@@ -6883,7 +6883,7 @@
 			</text>
 
 			<listbox>
-				<placement x="%text_pb_x%" y="%row3_y%" w="%content_width%" h="%listbox_advanced_height%"/>
+				<placement x="%text_pb_x%" y="%row3_y%" w="%list_width%" h="%listbox_advanced_height%"/>
 				<text>{@select_user=Select User}</text>
 				<icon selected="radio_true" unselected="radio_false" />
 				<data name="tw_crypto_user_id" />
